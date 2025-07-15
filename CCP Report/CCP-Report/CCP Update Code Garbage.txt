@@ -1,0 +1,312 @@
+#include <Windows.h>
+#include <GL/GL.h>
+#include <GL/glut.h>
+#include <cmath>
+
+// Initial position and visibility flag for flames
+int dotX = 220;
+int dotY = 100;
+bool flamesVisible = false;
+bool isCar = false; // Track whether the selected object is a car or rocket
+
+// Constants for ground level (car's fixed Y position)
+const int carGroundY = 50; // The Y position where the car stays above the ground
+const int rocketMinY = 100; // Minimum Y position for the rocket (just above the ground)
+const int rocketMaxY = 400; // Maximum Y position for the rocket (to prevent it going out of bounds)
+
+// Color constants for different parts of the rocket
+GLfloat bodyColor[] = { 0.8f, 0.8f, 0.8f };
+GLfloat noseColor[] = { 0.8f, 0.8f, 0.8f };
+GLfloat finColor[] = { 0.6f, 0.6f, 0.6f };
+GLfloat engineColor[] = { 0.4f, 0.4f, 0.4f };
+
+void myInit() {
+    glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
+    glColor3f(0.0f, 0.0f, 0.0f);
+    glPointSize(10.0f);
+    glMatrixMode(GL_PROJECTION);
+    gluOrtho2D(0.0, 640.0, 0.0, 480.0);
+}
+
+void drawGround() {
+    glColor3f(0.3f, 0.3f, 0.3f);
+    glBegin(GL_POLYGON);
+    glVertex2i(0, carGroundY); // Ensure ground is at the car's fixed Y position
+    glVertex2i(640, carGroundY);
+    glVertex2i(640, 0);
+    glVertex2i(0, 0);
+    glEnd();
+}
+
+void drawAntennaTowers() {
+    // Left antenna tower base
+    glColor3f(0.5f, 0.5f, 0.5f);
+    glBegin(GL_POLYGON);
+    glVertex2i(10, 50);
+    glVertex2i(30, 50);
+    glVertex2i(30, 200);
+    glVertex2i(10, 200);
+    glEnd();
+
+    // Left antenna tower top
+    glBegin(GL_POLYGON);
+    glVertex2i(15, 200);
+    glVertex2i(25, 200);
+    glVertex2i(25, 250);
+    glVertex2i(15, 250);
+    glEnd();
+
+    // Right antenna tower base
+    glColor3f(0.5f, 0.5f, 0.5f);
+    glBegin(GL_POLYGON);
+    glVertex2i(610, 50);
+    glVertex2i(630, 50);
+    glVertex2i(630, 200);
+    glVertex2i(610, 200);
+    glEnd();
+
+    // Right antenna tower top
+    glBegin(GL_POLYGON);
+    glVertex2i(615, 200);
+    glVertex2i(625, 200);
+    glVertex2i(625, 250);
+    glVertex2i(615, 250);
+    glEnd();
+}
+
+void drawRocketAndLand(int x, int y) {
+    // Rocket body
+    glColor3fv(bodyColor);
+    glBegin(GL_POLYGON);
+    glVertex2i(x + 50, y);
+    glVertex2i(x + 100, y);
+    glVertex2i(x + 100, y + 300);
+    glVertex2i(x + 50, y + 300);
+    glEnd();
+
+    // Rocket nose
+    glColor3fv(noseColor);
+    glBegin(GL_TRIANGLES);
+    glVertex2i(x + 50, y + 300);
+    glVertex2i(x + 100, y + 300);
+    glVertex2i(x + 75, y + 350);
+    glEnd();
+
+    // Rocket fins
+    glColor3fv(finColor);
+    glBegin(GL_TRIANGLES);
+    // Left fin
+    glVertex2i(x + 50, y + 200);
+    glVertex2i(x + 30, y + 150);
+    glVertex2i(x + 50, y + 150);
+
+    // Right fin
+    glVertex2i(x + 100, y + 200);
+    glVertex2i(x + 120, y + 150);
+    glVertex2i(x + 100, y + 150);
+
+    // Bottom left fin
+    glVertex2i(x + 50, y);
+    glVertex2i(x + 30, y - 50);
+    glVertex2i(x + 50, y - 50);
+
+    // Bottom right fin
+    glVertex2i(x + 100, y);
+    glVertex2i(x + 120, y - 50);
+    glVertex2i(x + 100, y - 50);
+    glEnd();
+
+    // Rocket engine
+    glColor3fv(engineColor);
+    glBegin(GL_POLYGON);
+    glVertex2i(x + 60, y - 50);
+    glVertex2i(x + 90, y - 50);
+    glVertex2i(x + 90, y);
+    glVertex2i(x + 60, y);
+    glEnd();
+
+    // Rocket flames
+    if (flamesVisible) {
+        glColor3f(1.0f, 0.5f, 0.0f);
+        glBegin(GL_TRIANGLES);
+        glVertex2i(x + 75, y - 50);
+        glVertex2i(x + 60, y - 100);
+        glVertex2i(x + 90, y - 100);
+        glEnd();
+    }
+}
+
+void drawCar(int x, int y) {
+    // Car body
+    glColor3f(0.8f, 0.0f, 0.0f); // Red color
+    glBegin(GL_POLYGON);
+    glVertex2i(x + 50, y);
+    glVertex2i(x + 150, y);
+    glVertex2i(x + 150, y + 50);
+    glVertex2i(x + 50, y + 50);
+    glEnd();
+
+    // Car roof
+    glColor3f(0.8f, 0.0f, 0.0f); // Red color
+    glBegin(GL_POLYGON);
+    glVertex2i(x + 70, y + 50);
+    glVertex2i(x + 130, y + 50);
+    glVertex2i(x + 110, y + 80);
+    glVertex2i(x + 90, y + 80);
+    glEnd();
+
+    // Car wheels
+    glColor3f(0.0f, 0.0f, 0.0f); // Black color
+    glBegin(GL_POLYGON);
+    for (int i = 0; i < 360; i++) {
+        float theta = i * 3.1415926f / 180;
+        glVertex2f(x + 70 + 10 * cos(theta), y - 10 + 10 * sin(theta));
+    }
+    glEnd();
+
+    glBegin(GL_POLYGON);
+    for (int i = 0; i < 360; i++) {
+        float theta = i * 3.1415926f / 180;
+        glVertex2f(x + 130 + 10 * cos(theta), y - 10 + 10 * sin(theta));
+    }
+    glEnd();
+}
+
+void menu(int option) {
+    switch (option) {
+    case 1:
+        //red
+        bodyColor[0] = 1.0f; bodyColor[1] = 0.0f; bodyColor[2] = 0.0f;
+        break;
+    case 2:
+        //green
+        noseColor[0] = 0.0f; noseColor[1] = 1.0f; noseColor[2] = 0.0f;
+        break;
+    case 3:
+        //blue
+        finColor[0] = 0.0f; finColor[1] = 0.0f; finColor[2] = 1.0f;
+        break;
+    case 4:
+        //yellow
+        engineColor[0] = 1.0f; engineColor[1] = 1.0f; engineColor[2] = 0.0f;
+        break;
+    case 5:
+        exit(0);
+    case 6:
+        isCar = true; // Select car
+        break;
+    case 7:
+        isCar = false; // Select rocket
+        break;
+    default:
+        break;
+    }
+    glClear(GL_COLOR_BUFFER_BIT);
+    drawGround();
+    drawAntennaTowers();
+
+    if (isCar) {
+        drawCar(dotX, carGroundY); // Car stays at a fixed Y position
+    }
+    else {
+        drawRocketAndLand(dotX, dotY);
+    }
+
+    glFlush();
+}
+
+void handleSpecialKeys(int key, int x, int y) {
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    if (isCar) {
+        // Car moves left-right
+        if (key == GLUT_KEY_LEFT) {
+            dotX -= 5;
+        }
+        else if (key == GLUT_KEY_RIGHT) {
+            dotX += 5;
+        }
+    }
+    else if (!isCar && flamesVisible) {
+        // Rocket moves up-down
+        if (key == GLUT_KEY_UP && dotY < rocketMaxY) {
+            dotY += 5;
+        }
+        else if (key == GLUT_KEY_DOWN && dotY > rocketMinY) {
+            dotY -= 5;
+        }
+    }
+
+    drawGround();
+    drawAntennaTowers();
+
+    if (isCar) {
+        drawCar(dotX, carGroundY); // Car stays fixed on the ground level
+    }
+    else {
+        drawRocketAndLand(dotX, dotY);
+    }
+    glFlush();
+}
+
+void handleKeys(unsigned char key, int x, int y) {
+    if (key == 'p' || key == 'P') {
+        flamesVisible = !flamesVisible;
+        glClear(GL_COLOR_BUFFER_BIT);
+        drawGround();
+        drawAntennaTowers();
+
+        if (isCar) {
+            drawCar(dotX, carGroundY);
+        }
+        else {
+            drawRocketAndLand(dotX, dotY);
+        }
+        glFlush();
+    }
+}
+
+void display() {
+    glClear(GL_COLOR_BUFFER_BIT);
+    drawGround();
+    drawAntennaTowers();
+
+    if (isCar) {
+        drawCar(dotX, carGroundY);
+    }
+    else {
+        drawRocketAndLand(dotX, dotY);
+    }
+
+    glFlush();
+}
+
+
+void createMenu() {
+    int menu_id = glutCreateMenu(menu);
+    glutAddMenuEntry("Change Rocket Body Color to Red", 1);
+    glutAddMenuEntry("Change Rocket Nose Color to Green", 2);
+    glutAddMenuEntry("Change Rocket Fin Color to Blue", 3);
+    glutAddMenuEntry("Change Rocket Engine Color to Yellow", 4);
+    glutAddMenuEntry("Exit", 5);
+    glutAddMenuEntry("Select Car", 6); // Add option to select car
+    glutAddMenuEntry("Select Rocket", 7); // Add option to select rocket
+    glutAttachMenu(GLUT_RIGHT_BUTTON); // Attach the menu to the right mouse button
+}
+
+
+
+
+int main(int argc, char** argv) {
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+    glutInitWindowSize(640, 480);
+    glutCreateWindow("Rocket Animation");
+    myInit();
+    createMenu();
+    glutDisplayFunc(display);
+    glutSpecialFunc(handleSpecialKeys);
+    glutKeyboardFunc(handleKeys);
+    glutMainLoop();
+    return 0;
+}
